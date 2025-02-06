@@ -53,7 +53,7 @@ INCIDENTS: List[Incident] = [
 @contextmanager
 def setup_test(app: AppName, deathstar_dir: str):
     before_containers = set(docker.from_env().containers.list())
-    subprocess.check_output("docker-compose up -d --wait", cwd=f"{deathstar_dir}/{app.value}",
+    subprocess.check_output("docker compose up -d --wait", cwd=f"{deathstar_dir}/{app.value}",
                             shell=True, stderr=subprocess.STDOUT)
     if app == AppName.socialNetwork:
         result = subprocess.check_output("python3 scripts/init_social_graph.py --graph=socfb-Reed98",
