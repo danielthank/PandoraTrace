@@ -14,7 +14,7 @@ from typing import Set, NamedTuple, List, Literal
 import docker
 from docker.models.containers import Container
 
-from jaeger_to_gent import download_traces_from_jaeger_for_all_services
+from jaeger_collector import download_traces_from_jaeger_for_all_services
 
 FUZZLER_COMPILE_COMMAND = "/RESTler/restler/Restler compile --api_spec ./swagger.json"
 EXEC_FUZZ_LEAN_COMMAND = "/RESTler/restler/Restler fuzz-lean --grammar_file ./Compile/grammar.py --dictionary_file ./Compile/dict.json --settings ./Compile/engine_settings.json --no_ssl"
