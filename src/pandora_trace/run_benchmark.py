@@ -38,15 +38,15 @@ class Incident(NamedTuple):
 
 RAW_TRAIN_TICKET_INCIDENTS = [
     ("tc qdisc add dev eth0 root netem loss 50%", "packet_loss", ["iproute2"]),
-    ("tc qdisc add dev eth0 root netem delay 100ms 20ms distribution normal", "latency", ["iproute2"]),
-    ("shutdown", "crush", []),
-    ("stress --cpu 1 --timeout 60s", "cpu_load", ["stress"]),
-    ("stress --vm 4 --vm-bytes 256M --timeout 60s", "memory_stress", ["stress"]),
-    ("stress --io 4 --timeout 60s", "disk_io_stress", ["stress"]),
+    # ("tc qdisc add dev eth0 root netem delay 100ms 20ms distribution normal", "latency", ["iproute2"]),
+    # ("shutdown", "crush", []),
+    # ("stress --cpu 1 --timeout 60s", "cpu_load", ["stress"]),
+    # ("stress --vm 4 --vm-bytes 256M --timeout 60s", "memory_stress", ["stress"]),
+    # ("stress --io 4 --timeout 60s", "disk_io_stress", ["stress"]),
 ]
 INCIDENTS: List[Incident] = [
     Incident(command=cmd, ratio=p / 10, incident_name=f"{name}-{p / 10}", apt_dependencies=deps)
-    for p in range(1, 11) for cmd, name, deps in RAW_TRAIN_TICKET_INCIDENTS
+    for p in range(1, 2) for cmd, name, deps in RAW_TRAIN_TICKET_INCIDENTS
 ]
 
 
@@ -74,7 +74,7 @@ def setup_test(app: AppName, deathstar_dir: str):
     finally:
         try:
             print("docker compose down...", end=" ", flush=True)
-            subprocess.check_output("docker-compose down -v", cwd=f"{deathstar_dir}/{app.value}",
+            subprocess.check_output("docker compose down -v", cwd=f"{deathstar_dir}/{app.value}",
                                     shell=True, stderr=subprocess.STDOUT)
             print("done")
         except Exception as e:
@@ -118,9 +118,10 @@ def run(container: Container, cmd: str, **kwargs):
             sleep(5)
 
 
-def add_chaos(app_containers: Set[Container], incident: Incident):
+def add_chaos(app_containers: Set[Container], incident: Incident) -> List[str]:
     chosen_containers = random.sample(list(app_containers), math.ceil(len(app_containers) * incident.ratio))
-    print(f"Adding incident {incident.incident_name} to containers {[c.name for c in chosen_containers]}", end='', flush=True)
+    affected_containers = [c.labels["com.docker.compose.service"] for c in chosen_containers]
+    print(f"Adding incident {incident.incident_name} to containers {affected_containers}", end='', flush=True)
     for container in chosen_containers:
         print('.', end='', flush=True)
         try:
@@ -137,6 +138,7 @@ def add_chaos(app_containers: Set[Container], incident: Incident):
             else:
                 print(f"Skip adding incident {incident.incident_name} to container {container.name} due to {e}")
     print()
+    return affected_containers
 
 
 def run_restler(restler_container: Container):
@@ -169,10 +171,10 @@ def run_test(app: AppName, incidents: List[Incident], deathstar_dir: str, target
         else:
             print(f"Running incident {incident.incident_name}")
         with setup_test(app, deathstar_dir) as (restler_container, app_containers):
-            add_chaos(app_containers, incident)
+            root_cause = add_chaos(app_containers, incident)
             for _ in range(50):
                 run_restler(restler_container)
-                traces = download_traces_from_jaeger_for_all_services(target_dir=target_dir)
+                traces = download_traces_from_jaeger_for_all_services(target_dir=target_dir, root_cause=root_cause)
                 if traces > target_count:
                     print(f"Collected {traces} traces for incident {incident.incident_name}")
                     break
